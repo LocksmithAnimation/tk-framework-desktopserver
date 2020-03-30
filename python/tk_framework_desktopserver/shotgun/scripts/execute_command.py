@@ -9,7 +9,9 @@
 # not expressly granted therein are reserved by Shotgun Software Inc.
 
 import sys
-import cPickle
+from sgtk.util import json as sg_json
+import json
+from tank_vendor import six
 import os
 import logging
 import base64
@@ -41,7 +43,7 @@ class _Formatter(logging.Formatter, object):
         making output from a logger using this formatter easily identifiable.
         """
         result = super(_Formatter, self).format(*args, **kwargs)
-        return "%s%s" % (LOGGING_PREFIX, base64.b64encode(result))
+        return "%s%s" % (LOGGING_PREFIX, six.ensure_str(base64.b64encode(six.ensure_binary(result))))
 
 def app_upgrade_info(engine):
     """
@@ -290,8 +292,7 @@ def execute(config, project, name, entities, base_configuration, engine_name, bu
     # We need to make sure that we're not introducing unicode into the
     # environment. This cropped up with some studio-team apps that ended
     # up causing some hangs on launch.
-    if isinstance(core_root, unicode):
-        core_root = core_root.encode("utf-8")
+    core_root = six.ensure_str(core_root)
 
     sgtk.util.prepend_path_to_env_var(
         "PYTHONPATH",
@@ -330,8 +331,7 @@ def execute(config, project, name, entities, base_configuration, engine_name, bu
     # environment. This appears to happen at times, likely due to some
     # component of the path built by pipeline_configuration "infecting"
     # the resulting aggregate path.
-    if isinstance(config_path, unicode):
-        config_path = config_path.encode("utf-8")
+    config_path = six.ensure_str(config_path)
 
     os.environ["TANK_CURRENT_PC"] = config_path
 
@@ -345,8 +345,8 @@ def execute(config, project, name, entities, base_configuration, engine_name, bu
 if __name__ == "__main__":
     arg_data_file = sys.argv[1]
 
-    with open(arg_data_file, "rb") as fh:
-        arg_data = cPickle.load(fh)
+    with open(arg_data_file, "rt") as fh:
+        arg_data = sg_json.load(fh)
 
     # The RPC api has given us the path to its tk-core to prepend
     # to our sys.path prior to importing sgtk. We'll prepent the

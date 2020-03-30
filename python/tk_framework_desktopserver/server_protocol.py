@@ -439,9 +439,9 @@ class ServerProtocol(WebSocketServerProtocol):
         # ensure_ascii allows unicode strings.
         payload = json.dumps(
             data,
-            ensure_ascii=False,
+            ensure_ascii=True,
             default=self._json_date_handler,
-        ).encode("utf8")
+        )
 
         if self._fernet:
             payload = self._fernet.encrypt(payload)

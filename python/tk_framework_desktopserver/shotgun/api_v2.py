@@ -11,7 +11,6 @@
 import sys
 import os
 import re
-import cPickle
 import sqlite3
 import json
 import tempfile
@@ -28,12 +27,24 @@ import time
 import fnmatch
 
 import sgtk
+from sgtk.util import json as sg_json
+from tank_vendor import six
 from sgtk import TankFileDoesNotExistError
 from sgtk.commands.clone_configuration import clone_pipeline_configuration_html
 from . import constants
 from .. import command
 
 logger = sgtk.platform.get_logger(__name__)
+
+@contextlib.contextmanager
+def tk_in_python_path():
+    backup = os.environ.get("PYTHONPATH")
+    try:
+        sgtk.util.prepend_path_to_env_var("PYTHONPATH", sgtk.get_sgtk_module_path())
+        yield
+    finally:
+        if backup:
+            os.environ["PYTHONPATH"] = backup
 
 ###########################################################################
 # Classes
@@ -281,7 +292,8 @@ class ShotgunAPI(object):
         if sgtk.get_authenticated_user():
             sgtk.get_authenticated_user().refresh_credentials()
 
-        retcode, stdout, stderr = command.Command.call_cmd(args)
+        with tk_in_python_path():
+            retcode, stdout, stderr = command.Command.call_cmd(args)
 
         # We need to filter stdout before we send it to the client.
         # We look for lines that we know came from the custom log
@@ -301,7 +313,11 @@ class ShotgunAPI(object):
         # message that wasn't on the first line of text before any newlines.
         for line in stdout.split("\n") + stderr.split("\n"):
             if line.startswith(tag):
-                filtered_output.append(base64.b64decode(line[tag_length:]))
+                try:
+                    filtered_output.append(six.ensure_str(base64.b64decode(line[tag_length:])))
+                except:
+                    print(type(line), line[tag_length:])
+                    raise
 
         filtered_output_string = "\n".join(filtered_output)
 
@@ -578,7 +594,15 @@ class ShotgunAPI(object):
                     )
 
                 try:
-                    if cached_data:
+                    decoded_data = None
+                    try:
+                        decoded_data = sg_json.loads(str(cached_data[0]))
+                    except Exception:
+                        # Couldn't decode the data. This happens when loading an old pickled cache.
+                        # We've switch to JSON for the Python 3 port.
+                        pass
+
+                    if decoded_data:
                         # Cache hit.
                         cached_contents_hash = cached_data[1]
 
@@ -599,7 +623,7 @@ class ShotgunAPI(object):
                         logger.debug("Cache key was %s", lookup_hash)
 
                         actions = self._process_commands(
-                            commands=cPickle.loads(str(cached_data[0])),
+                            commands=decoded_data,
                             project=project_entity,
                             entities=entities,
                         )
@@ -878,7 +902,8 @@ class ShotgunAPI(object):
         # we protect ourselves from spawning concurrent caching subprocesses
         # that might end up stepping on each other.
         with self._LOCK:
-            retcode, stdout, stderr = command.Command.call_cmd(args)
+            with tk_in_python_path():
+                retcode, stdout, stderr = command.Command.call_cmd(args)
 
         if retcode == 0:
             logger.debug("Command stdout: %s", stdout)
@@ -1052,13 +1077,8 @@ class ShotgunAPI(object):
         :rtype: str
         """
         args_file = tempfile.mkstemp()[1]
-
-        with open(args_file, "wb") as fh:
-            cPickle.dump(
-                args_data,
-                fh,
-                cPickle.HIGHEST_PROTOCOL,
-            )
+        with open(args_file, "wt") as fh:
+            json.dump(args_data, fh, ensure_ascii=True)
 
         return args_file
 
@@ -1104,7 +1124,7 @@ class ShotgunAPI(object):
 
         hash_data = hashlib.md5()
         hash_data.update(json_data)
-        return hash_data.digest()
+        return six.ensure_str(base64.b64encode(hash_data.digest()))
 
     def _get_entities_from_payload(self, data):
         """
