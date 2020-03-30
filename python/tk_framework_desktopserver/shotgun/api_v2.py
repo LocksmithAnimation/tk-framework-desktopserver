@@ -313,11 +313,7 @@ class ShotgunAPI(object):
         # message that wasn't on the first line of text before any newlines.
         for line in stdout.split("\n") + stderr.split("\n"):
             if line.startswith(tag):
-                try:
-                    filtered_output.append(six.ensure_str(base64.b64decode(line[tag_length:])))
-                except:
-                    print(type(line), line[tag_length:])
-                    raise
+                filtered_output.append(six.ensure_str(base64.b64decode(line[tag_length:])))
 
         filtered_output_string = "\n".join(filtered_output)
 
