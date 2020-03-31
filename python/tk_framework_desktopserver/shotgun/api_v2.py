@@ -38,6 +38,16 @@ logger = sgtk.platform.get_logger(__name__)
 
 @contextlib.contextmanager
 def tk_in_python_path():
+    """
+    Context manager that ensures that Toolkit is in the PYTHONPATH.
+
+    This is necessary so six and sgtk.util.json can be used early on
+    when launching a subprocess.
+
+    The PYTHONPATH is restored to it's previous value after the call.
+
+    :yields: None.
+    """
     backup = os.environ.get("PYTHONPATH")
     try:
         sgtk.util.prepend_path_to_env_var("PYTHONPATH", sgtk.get_sgtk_module_path())
@@ -1120,6 +1130,8 @@ class ShotgunAPI(object):
 
         hash_data = hashlib.md5()
         hash_data.update(json_data)
+        # Base64 encode the digest, will is a binary string
+        # in Python 3. This ensures we can always encode it to a str.
         return six.ensure_str(base64.b64encode(hash_data.digest()))
 
     def _get_entities_from_payload(self, data):

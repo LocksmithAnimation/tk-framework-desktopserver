@@ -437,6 +437,11 @@ class ServerProtocol(WebSocketServerProtocol):
         :param data: Object Data that will be converted to JSON and sent to client.
         """
         # ensure_ascii allows unicode strings.
+        # FIXME: Validate that this is actually required.
+        # During the Python 3 encoding errors happened when encoding
+        # the output of json.dumps to utf8 when running this code
+        # in Python 2 but sending data that was collected from a
+        # Python 3 process.
         payload = json.dumps(
             data,
             ensure_ascii=True,
