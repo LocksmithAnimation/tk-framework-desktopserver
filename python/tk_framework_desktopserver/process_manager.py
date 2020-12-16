@@ -12,6 +12,7 @@ import sys
 import os
 import glob
 from .command import Command
+import sgtk.platform
 
 from sgtk.platform.qt import QtGui, QtCore
 import sgtk.util
@@ -337,7 +338,9 @@ class ProcessManager(object):
                     f += os.path.sep
                 files.append(f)
 
-        return files
+        tk = sgtk.platform.current_engine().sgtk
+
+        return [sgtk.util.get_variable_path(tk, file)[1] for file in files]
 
     def pick_file_or_directory(self, multi=False):
         """

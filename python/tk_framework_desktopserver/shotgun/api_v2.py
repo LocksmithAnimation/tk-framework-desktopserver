@@ -745,7 +745,7 @@ class ShotgunAPI(object):
                     "Local storages were reported by Shotgun: %s", local_storages
                 )
 
-            result = self.process_manager.open(filepath)
+            result = self.process_manager.open(sgtk.util.ShotgunPath.expand(filepath))
 
             # Send back information regarding the success of the operation.
             reply = {}
